@@ -1,0 +1,20 @@
+# LimbVital rPPG Engine – Python Dependencies
+# Install with: pip install -r requirements.txt
+
+# Core Framework
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+websockets>=13.1
+
+# Computer Vision & Signal Processing
+opencv-python>=4.10.0
+numpy>=1.26.0
+scipy>=1.14.0
+
+# MediaPipe – Tasks API (face_landmarker.task model auto-downloaded on first run)
+# >= 0.10.0 uses the new Tasks API; mediapipe.solutions was removed in 0.10.x
+mediapipe>=0.10.0
+
+# Utilities
+python-dotenv>=1.0.1
+aiohttp>=3.9.0        # used by test_backend.py HTTP tests
