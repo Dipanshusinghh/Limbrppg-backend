@@ -1,25 +1,14 @@
-"""
-LimbVital rPPG Engine – Utility Functions
-"""
-
 import base64
 import numpy as np
 import cv2
+import time
 
-
-def base64_to_cv2(base64_string: str) -> np.ndarray | None:
+def base64_to_cv2(base64_string: str) -> np.ndarray:
     """
-    Convert a Base64-encoded image string (with or without data-URL prefix)
-    to an OpenCV BGR image.
-
-    Args:
-        base64_string: e.g. "data:image/jpeg;base64,/9j/4AAQ..." or raw base64
-
-    Returns:
-        BGR ndarray, or None if decoding fails.
+    Base64 string (image data) ko OpenCV BGR format mein badalne ke liye.
     """
     try:
-        # Strip optional data-URL prefix
+        # Agar prefix (data:image/...) hai toh usse hatao
         if "," in base64_string:
             base64_string = base64_string.split(",", 1)[1]
 
@@ -28,98 +17,61 @@ def base64_to_cv2(base64_string: str) -> np.ndarray | None:
         frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
         if frame is None:
-            print("⚠️  cv2.imdecode returned None – check image data")
-
+            print("Warning: imdecode return failed")
         return frame
 
-    except base64.binascii.Error as e:
-        print(f"❌ Base64 decode error: {e}")
-        return None
     except Exception as e:
-        print(f"❌ Image conversion error: {e}")
+        print(f"Conversion error: {e}")
         return None
-
 
 def normalize_signal(signal_array) -> np.ndarray:
     """
-    Normalize a signal to the [0, 1] range.
-
-    Args:
-        signal_array: list or ndarray of floats
-
-    Returns:
-        Normalized ndarray.
+    Signal ko 0-1 ki range mein normalize karne ke liye.
     """
     arr = np.array(signal_array, dtype=float)
-    if arr.size < 2:
-        return arr
+    if arr.size < 2: return arr
+    
     lo, hi = arr.min(), arr.max()
-    if hi == lo:
-        return np.zeros_like(arr)
+    if hi == lo: return np.zeros_like(arr)
+    
     return (arr - lo) / (hi - lo)
 
-
-def get_roi_average(
-    frame: np.ndarray,
-    x: int,
-    y: int,
-    w: int = 20,
-    h: int = 20,
-    channel: str = "green",
-) -> float:
+def get_roi_average(frame, x, y, w=20, h=20, channel="green"):
     """
-    Return the mean pixel value of a colour channel inside a ROI.
-
-    Args:
-        frame:   BGR image
-        x, y:   top-left corner of ROI
-        w, h:   ROI dimensions
-        channel: 'red', 'green', or 'blue'
-
-    Returns:
-        Mean channel value (0–255).
+    Kisi specific area (ROI) ka mean pixel value nikalna.
     """
     H, W = frame.shape[:2]
+    # Boundary checks
     x1, x2 = max(0, x), min(W, x + w)
     y1, y2 = max(0, y), min(H, y + h)
+    
     roi = frame[y1:y2, x1:x2]
-    if roi.size == 0:
-        return 0.0
-    channel_idx = {"blue": 0, "green": 1, "red": 2}.get(channel.lower(), 1)
-    return float(np.mean(roi[:, :, channel_idx]))
+    if roi.size == 0: return 0.0
+    
+    # BGR order: Blue=0, Green=1, Red=2
+    idx = {"blue": 0, "green": 1, "red": 2}.get(channel.lower(), 1)
+    return float(np.mean(roi[:, :, idx]))
 
-
-def validate_frame(
-    frame, min_size: tuple[int, int] = (160, 160)
-) -> tuple[bool, str]:
+def validate_frame(frame, min_size=(160, 160)):
     """
-    Check that a frame is a valid BGR image with a minimum resolution.
-
-    Returns:
-        (True, "Valid") or (False, <reason>)
+    Check karna ki frame valid hai aur resolution sahi hai ya nahi.
     """
-    if frame is None:
-        return False, "Frame is None"
-    if not isinstance(frame, np.ndarray):
-        return False, "Frame is not a numpy array"
+    if frame is None or not isinstance(frame, np.ndarray):
+        return False, "Invalid image object"
+    
     if frame.ndim != 3 or frame.shape[2] != 3:
-        return False, "Frame must be a 3-channel (BGR) image"
+        return False, "Not a BGR image"
+        
     h, w = frame.shape[:2]
     if w < min_size[0] or h < min_size[1]:
-        return False, f"Frame too small: {w}×{h} (min {min_size[0]}×{min_size[1]})"
+        return False, f"Resolution too low: {w}x{h}"
+        
     return True, "Valid"
-
 
 def fps_calculator():
     """
-    Generator that yields instantaneous FPS each time next() is called.
-
-    Usage:
-        calc = fps_calculator()
-        while True:
-            fps = next(calc)
+    Real-time FPS calculate karne ke liye generator.
     """
-    import time
     last = time.time()
     while True:
         now = time.time()
